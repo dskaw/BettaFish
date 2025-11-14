@@ -60,6 +60,10 @@ class DeepSearchAgent:
             api_key=(self.config.MEDIA_ENGINE_API_KEY or self.config.MINDSPIDER_API_KEY),
             model_name=(self.config.MEDIA_ENGINE_MODEL_NAME or self.config.MINDSPIDER_MODEL_NAME),
             base_url=(self.config.MEDIA_ENGINE_BASE_URL or self.config.MINDSPIDER_BASE_URL),
+            cli_command=(
+                getattr(self.config, "MEDIA_ENGINE_CLI_COMMAND", None)
+                or getattr(self.config, "MINDSPIDER_CLI_COMMAND", None)
+            ),
         )
     
     def _initialize_nodes(self):

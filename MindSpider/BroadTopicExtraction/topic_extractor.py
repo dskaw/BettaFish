@@ -5,15 +5,29 @@ BroadTopicExtraction模块 - 话题提取器
 基于DeepSeek直接提取关键词和生成新闻总结
 """
 
+import os
 import sys
 import json
 import re
 from pathlib import Path
-from typing import List, Dict, Tuple
+from typing import List, Dict, Optional, Tuple
 from openai import OpenAI
 
 # 添加项目根目录到路径
 project_root = Path(__file__).parent.parent
+repo_root = project_root.parent
+if str(repo_root) not in sys.path:
+    sys.path.append(str(repo_root))
+
+try:
+    from utils.cli_llm import CodexCLIError, CodexCLIInvoker
+except ImportError:
+    CodexCLIError = RuntimeError  # type: ignore
+
+    class CodexCLIInvoker:  # type: ignore
+        def __init__(self, *args, **kwargs):
+            raise NotImplementedError("CodexCLIInvoker requires utils.cli_llm")
+
 sys.path.append(str(project_root))
 
 try:
@@ -27,10 +41,26 @@ class TopicExtractor:
 
     def __init__(self):
         """初始化话题提取器"""
-        self.client = OpenAI(
-            api_key=settings.MINDSPIDER_API_KEY,
-            base_url=settings.MINDSPIDER_BASE_URL
-        )
+        timeout_fallback = os.getenv("LLM_REQUEST_TIMEOUT") or os.getenv("MINDSPIDER_REQUEST_TIMEOUT") or "1800"
+        try:
+            self.timeout = float(timeout_fallback)
+        except ValueError:
+            self.timeout = 1800.0
+
+        self.cli_command = getattr(settings, "MINDSPIDER_CLI_COMMAND", None)
+        self._cli_invoker: Optional[CodexCLIInvoker] = None
+
+        if self.cli_command:
+            self._cli_invoker = CodexCLIInvoker(self.cli_command, self.timeout)
+            self.client = None  # type: ignore[assignment]
+        else:
+            if not settings.MINDSPIDER_API_KEY:
+                raise ValueError("MINDSPIDER_API_KEY 未配置，且未提供 CLI 命令。")
+
+            self.client = OpenAI(
+                api_key=settings.MINDSPIDER_API_KEY,
+                base_url=settings.MINDSPIDER_BASE_URL
+            )
         self.model = settings.MINDSPIDER_MODEL_NAME
     
     def extract_keywords_and_summary(self, news_list: List[Dict], max_keywords: int = 100) -> Tuple[List[str], str]:
@@ -53,28 +83,35 @@ class TopicExtractor:
         # 构建提示词
         prompt = self._build_analysis_prompt(news_text, max_keywords)
         
+        messages = [
+            {"role": "system", "content": "你是一个专业的新闻分析师，擅长从热点新闻中提取关键词和撰写分析总结。"},
+            {"role": "user", "content": prompt}
+        ]
+
         try:
-            # 调用DeepSeek API
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": "你是一个专业的新闻分析师，擅长从热点新闻中提取关键词和撰写分析总结。"},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=1500,
-                temperature=0.3
-            )
-            
-            # 解析返回结果
-            result_text = response.choices[0].message.content
+            if self._cli_invoker:
+                rendered_prompt = self._render_messages(messages)
+                result_text = self._cli_invoker.run(
+                    rendered_prompt,
+                    model_name=self.model,
+                    timeout=self.timeout,
+                )
+            else:
+                response = self.client.chat.completions.create(  # type: ignore[union-attr]
+                    model=self.model,
+                    messages=messages,
+                    max_tokens=1500,
+                    temperature=0.3
+                )
+                result_text = response.choices[0].message.content
+
             keywords, summary = self._parse_analysis_result(result_text)
-            
+
             print(f"成功提取 {len(keywords)} 个关键词并生成新闻总结")
             return keywords[:max_keywords], summary
-            
-        except Exception as e:
+
+        except (Exception, CodexCLIError) as e:
             print(f"话题提取失败: {e}")
-            # 返回简单的fallback结果
             fallback_keywords = self._extract_simple_keywords(news_list)
             fallback_summary = f"今日共收集到 {len(news_list)} 条热点新闻，涵盖多个平台的热门话题。"
             return fallback_keywords[:max_keywords], fallback_summary
@@ -97,7 +134,7 @@ class TopicExtractor:
     def _build_analysis_prompt(self, news_text: str, max_keywords: int) -> str:
         """构建分析提示词"""
         news_count = len(news_text.split('\n'))
-        
+
         prompt = f"""
 请分析以下{news_count}条今日热点新闻，完成两个任务：
 
@@ -127,6 +164,17 @@ class TopicExtractor:
 请直接输出JSON格式的结果，不要包含其他文字说明。
 """
         return prompt
+
+    @staticmethod
+    def _render_messages(messages: List[Dict[str, str]]) -> str:
+        parts = []
+        for message in messages:
+            role = message.get("role", "user")
+            content = message.get("content", "")
+            if not content:
+                continue
+            parts.append(f"[{role}]\n{content}")
+        return "\n\n".join(parts).strip()
     
     def _parse_analysis_result(self, result_text: str) -> Tuple[List[str], str]:
         """解析分析结果"""

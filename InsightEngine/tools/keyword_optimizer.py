@@ -7,7 +7,7 @@ from openai import OpenAI
 import json
 import sys
 import os
-from typing import List, Dict, Any
+from typing import Any, Dict, List, Optional
 from dataclasses import dataclass
 
 # 添加项目根目录到Python路径以导入config
@@ -23,6 +23,7 @@ if utils_dir not in sys.path:
     sys.path.append(utils_dir)
 
 from retry_helper import with_graceful_retry, SEARCH_API_RETRY_CONFIG
+from cli_llm import CodexCLIError, CodexCLIInvoker
 
 @dataclass
 class KeywordOptimizationResponse:
@@ -39,7 +40,13 @@ class KeywordOptimizer:
     使用硅基流动的Qwen3模型将Agent生成的搜索词优化为更贴近真实舆情的关键词
     """
     
-    def __init__(self, api_key: str = None, base_url: str = None, model_name: str = None):
+    def __init__(
+        self,
+        api_key: str = None,
+        base_url: str = None,
+        model_name: str = None,
+        cli_command: Optional[str] = None,
+    ):
         """
         初始化关键词优化器
         
@@ -47,18 +54,30 @@ class KeywordOptimizer:
             api_key: 硅基流动API密钥，如果不提供则从配置文件读取
             base_url: 接口基础地址，默认使用配置文件提供的SiliconFlow地址
         """
+        timeout_fallback = os.getenv("LLM_REQUEST_TIMEOUT") or os.getenv("KEYWORD_OPTIMIZER_REQUEST_TIMEOUT") or "1800"
+        try:
+            self.timeout = float(timeout_fallback)
+        except ValueError:
+            self.timeout = 1800.0
+
+        self.cli_command = cli_command or getattr(settings, "KEYWORD_OPTIMIZER_CLI_COMMAND", None)
+        self._cli_invoker: Optional[CodexCLIInvoker] = None
+
         self.api_key = api_key or settings.KEYWORD_OPTIMIZER_API_KEY
-
-        if not self.api_key:
-            raise ValueError("未找到硅基流动API密钥，请在config.py中设置KEYWORD_OPTIMIZER_API_KEY")
-
         self.base_url = base_url or settings.KEYWORD_OPTIMIZER_BASE_URL
-
-        self.client = OpenAI(
-            api_key=self.api_key,
-            base_url=self.base_url
-        )
         self.model = model_name or settings.KEYWORD_OPTIMIZER_MODEL_NAME
+
+        if self.cli_command:
+            self._cli_invoker = CodexCLIInvoker(self.cli_command, self.timeout)
+            self.client = None  # type: ignore[assignment]
+        else:
+            if not self.api_key:
+                raise ValueError("未找到硅基流动API密钥，请在config.py中设置KEYWORD_OPTIMIZER_API_KEY")
+
+            self.client = OpenAI(
+                api_key=self.api_key,
+                base_url=self.base_url
+            )
     
     def optimize_keywords(self, original_query: str, context: str = "") -> KeywordOptimizationResponse:
         """
@@ -192,12 +211,23 @@ class KeywordOptimizer:
     def _call_qwen_api(self, system_prompt: str, user_prompt: str) -> Dict[str, Any]:
         """调用Qwen API"""
         try:
-            response = self.client.chat.completions.create(
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ]
+
+            if self._cli_invoker:
+                rendered_prompt = self._render_messages(messages)
+                content = self._cli_invoker.run(
+                    rendered_prompt,
+                    model_name=self.model,
+                    timeout=self.timeout,
+                )
+                return {"success": True, "content": content}
+
+            response = self.client.chat.completions.create(  # type: ignore[union-attr]
                 model=self.model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
+                messages=messages,
                 temperature=0.7,
             )
 
@@ -206,8 +236,19 @@ class KeywordOptimizer:
                 return {"success": True, "content": content}
             else:
                 return {"success": False, "error": "API返回格式异常"}
-        except Exception as e:
+        except (Exception, CodexCLIError) as e:
             return {"success": False, "error": f"API调用异常: {str(e)}"}
+
+    @staticmethod
+    def _render_messages(messages: List[Dict[str, str]]) -> str:
+        parts = []
+        for message in messages:
+            role = message.get("role", "user")
+            content = message.get("content", "")
+            if not content:
+                continue
+            parts.append(f"[{role}]\n{content}")
+        return "\n\n".join(parts).strip()
     
     def _extract_keywords_from_text(self, text: str) -> List[str]:
         """从文本中提取关键词（当JSON解析失败时使用）"""

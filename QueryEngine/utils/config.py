@@ -26,10 +26,11 @@ class Settings(BaseSettings):
     """
     
     # ======================= LLM 相关 =======================
-    QUERY_ENGINE_API_KEY: str = Field(..., description="Query Engine LLM API密钥，用于主LLM。您可以更改每个部分LLM使用的API，🚩只要兼容OpenAI请求格式都可以，定义好KEY、BASE_URL与MODEL_NAME即可正常使用。")
+    QUERY_ENGINE_API_KEY: Optional[str] = Field(None, description="Query Engine LLM API密钥，用于主LLM。您可以更改每个部分LLM使用的API，🚩只要兼容OpenAI请求格式都可以，定义好KEY、BASE_URL与MODEL_NAME即可正常使用。")
     QUERY_ENGINE_BASE_URL: Optional[str] = Field(None, description="Query Engine LLM接口BaseUrl，可自定义厂商API")
     QUERY_ENGINE_MODEL_NAME: str = Field(..., description="Query Engine LLM模型名称")
     QUERY_ENGINE_PROVIDER: Optional[str] = Field(None, description="Query Engine LLM提供商（兼容字段）")
+    QUERY_ENGINE_CLI_COMMAND: Optional[str] = Field(None, description="Query Engine CLI 命令模板，可通过命令行调用模型，支持 {model} 占位符。")
     
     # ================== 网络工具配置 ====================
     TAVILY_API_KEY: str = Field(..., description="Tavily API（申请地址：https://www.tavily.com/）API密钥，用于Tavily网络搜索")
@@ -75,5 +76,6 @@ def print_config(config: Settings):
     message += f"输出目录: {config.OUTPUT_DIR}\n"
     message += f"保存中间状态: {config.SAVE_INTERMEDIATE_STATES}\n"
     message += f"LLM API Key: {'已配置' if config.QUERY_ENGINE_API_KEY else '未配置'}\n"
+    message += f"CLI Command: {config.QUERY_ENGINE_CLI_COMMAND or '未配置'}\n"
     message += "========================\n"
     logger.info(message)

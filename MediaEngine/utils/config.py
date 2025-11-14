@@ -31,10 +31,12 @@ class Settings(BaseSettings):
     INSIGHT_ENGINE_API_KEY: str = Field(None, description="Insight Agent（推荐Kimi，https://platform.moonshot.cn/）API密钥，用于主LLM。您可以更改每个部分LLM使用的API，🚩只要兼容OpenAI请求格式都可以，定义好KEY、BASE_URL与MODEL_NAME即可正常使用。重要提醒：我们强烈推荐您先使用推荐的配置申请API，先跑通再进行您的更改！")
     INSIGHT_ENGINE_BASE_URL: Optional[str] = Field("https://api.moonshot.cn/v1", description="Insight Agent LLM接口BaseUrl，可自定义厂商API")
     INSIGHT_ENGINE_MODEL_NAME: str = Field("kimi-k2-0711-preview", description="Insight Agent LLM模型名称，如kimi-k2-0711-preview")
+    INSIGHT_ENGINE_CLI_COMMAND: Optional[str] = Field(None, description="Insight Agent CLI 命令模板，支持通过命令行方式调用模型，允许使用 {model} 占位符。")
     
     MEDIA_ENGINE_API_KEY: str = Field(None, description="Media Agent（推荐Gemini，这里我用了一个中转厂商，你也可以换成你自己的，申请地址：https://www.chataiapi.com/）API密钥")
     MEDIA_ENGINE_BASE_URL: Optional[str] = Field("https://www.chataiapi.com/v1", description="Media Agent LLM接口BaseUrl")
     MEDIA_ENGINE_MODEL_NAME: str = Field("gemini-2.5-pro", description="Media Agent LLM模型名称，如gemini-2.5-pro")
+    MEDIA_ENGINE_CLI_COMMAND: Optional[str] = Field(None, description="Media Agent CLI 命令模板，配置后可通过 Codex 等命令行工具调用模型。")
     
     BOCHA_WEB_SEARCH_API_KEY: Optional[str] = Field(None, description="Bocha Web Search API Key")
     BOCHA_API_KEY: Optional[str] = Field(None, description="Bocha 兼容键（别名）")
@@ -47,6 +49,7 @@ class Settings(BaseSettings):
     MINDSPIDER_API_KEY: Optional[str] = Field(None, description="MindSpider API密钥")
     MINDSPIDER_BASE_URL: Optional[str] = Field("https://api.deepseek.com", description="MindSpider LLM接口BaseUrl")
     MINDSPIDER_MODEL_NAME: str = Field("deepseek-reasoner", description="MindSpider LLM模型名称，如deepseek-reasoner")
+    MINDSPIDER_CLI_COMMAND: Optional[str] = Field(None, description="MindSpider CLI 命令模板，可使用 {model} 占位符。")
     
     OUTPUT_DIR: str = Field("reports", description="输出目录")
     SAVE_INTERMEDIATE_STATES: bool = Field(True, description="是否保存中间状态")
@@ -55,18 +58,22 @@ class Settings(BaseSettings):
     QUERY_ENGINE_API_KEY: str = Field(None, description="Query Agent（推荐DeepSeek，https://www.deepseek.com/）API密钥")
     QUERY_ENGINE_BASE_URL: Optional[str] = Field("https://api.deepseek.com", description="Query Agent LLM接口BaseUrl")
     QUERY_ENGINE_MODEL_NAME: str = Field("deepseek-reasoner", description="Query Agent LLM模型，如deepseek-reasoner")
+    QUERY_ENGINE_CLI_COMMAND: Optional[str] = Field(None, description="Query Agent CLI 命令模板，用于命令行调用模型。")
     
     REPORT_ENGINE_API_KEY: str = Field(None, description="Report Agent（推荐Gemini，这里我用了一个中转厂商，你也可以换成你自己的，申请地址：https://www.chataiapi.com/）API密钥")
     REPORT_ENGINE_BASE_URL: Optional[str] = Field("https://www.chataiapi.com/v1", description="Report Agent LLM接口BaseUrl")
     REPORT_ENGINE_MODEL_NAME: str = Field("gemini-2.5-pro", description="Report Agent LLM模型，如gemini-2.5-pro")
+    REPORT_ENGINE_CLI_COMMAND: Optional[str] = Field(None, description="Report Agent CLI 命令模板，可包含 {model} 占位符。")
     
     FORUM_HOST_API_KEY: str = Field(None, description="Forum Host（Qwen3最新模型，这里我使用了硅基流动这个平台，申请地址：https://cloud.siliconflow.cn/）API密钥")
     FORUM_HOST_BASE_URL: Optional[str] = Field("https://api.siliconflow.cn/v1", description="Forum Host LLM BaseUrl")
     FORUM_HOST_MODEL_NAME: str = Field("Qwen/Qwen3-235B-A22B-Instruct-2507", description="Forum Host LLM模型名，如Qwen/Qwen3-235B-A22B-Instruct-2507")
+    FORUM_HOST_CLI_COMMAND: Optional[str] = Field(None, description="Forum Host CLI 命令模板。")
     
     KEYWORD_OPTIMIZER_API_KEY: str = Field(None, description="SQL keyword Optimizer（小参数Qwen3模型，这里我使用了硅基流动这个平台，申请地址：https://cloud.siliconflow.cn/）API密钥")
     KEYWORD_OPTIMIZER_BASE_URL: Optional[str] = Field("https://api.siliconflow.cn/v1", description="Keyword Optimizer BaseUrl")
     KEYWORD_OPTIMIZER_MODEL_NAME: str = Field("Qwen/Qwen3-30B-A3B-Instruct-2507", description="Keyword Optimizer LLM模型名称，如Qwen/Qwen3-30B-A3B-Instruct-2507")
+    KEYWORD_OPTIMIZER_CLI_COMMAND: Optional[str] = Field(None, description="Keyword Optimizer CLI 命令模板，可通过命令行方式调用模型。")
 
     # ================== 网络工具配置 ====================
     TAVILY_API_KEY: str = Field(None, description="Tavily API（申请地址：https://www.tavily.com/）API密钥，用于Tavily网络搜索")

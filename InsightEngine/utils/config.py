@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     INSIGHT_ENGINE_API_KEY: Optional[str] = Field(None, description="Insight Engine LLM API密钥")
     INSIGHT_ENGINE_BASE_URL: Optional[str] = Field(None, description="Insight Engine LLM base url，可选")
     INSIGHT_ENGINE_MODEL_NAME: Optional[str] = Field(None, description="Insight Engine LLM模型名称")
+    INSIGHT_ENGINE_CLI_COMMAND: Optional[str] = Field(None, description="Insight Engine CLI 命令模板，可通过命令行调用模型。")
     INSIGHT_ENGINE_PROVIDER: Optional[str] = Field(None, description="Insight Engine模型提供者，不再建议使用")
     DB_HOST: Optional[str] = Field(None, description="数据库主机")
     DB_USER: Optional[str] = Field(None, description="数据库用户名")

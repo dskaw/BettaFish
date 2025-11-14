@@ -45,36 +45,43 @@ class Settings(BaseSettings):
     INSIGHT_ENGINE_API_KEY: Optional[str] = Field(None, description="Insight Agent（推荐 kimi-k2，官方申请地址：https://platform.moonshot.cn/）API 密钥，用于主 LLM。🚩请先按推荐配置申请并跑通，再根据需要调整 KEY、BASE_URL 与 MODEL_NAME。")
     INSIGHT_ENGINE_BASE_URL: Optional[str] = Field("https://api.moonshot.cn/v1", description="Insight Agent LLM BaseUrl，可根据厂商自定义")
     INSIGHT_ENGINE_MODEL_NAME: str = Field("kimi-k2-0711-preview", description="Insight Agent LLM 模型名称，例如 kimi-k2-0711-preview")
+    INSIGHT_ENGINE_CLI_COMMAND: Optional[str] = Field(None, description="Insight Agent CLI 命令模板，若配置则优先通过命令行（如 codex）调用模型。可使用 {model} 占位符。")
     
     # Media Agent（推荐Gemini，推荐中转厂商：https://aihubmix.com/?aff=8Ds9）
     MEDIA_ENGINE_API_KEY: Optional[str] = Field(None, description="Media Agent（推荐 Gemini-2.5-pro，中转厂商申请地址：https://aihubmix.com/?aff=8Ds9）API 密钥")
     MEDIA_ENGINE_BASE_URL: Optional[str] = Field("https://aihubmix.com/v1", description="Media Agent LLM BaseUrl，可根据中转服务调整")
     MEDIA_ENGINE_MODEL_NAME: str = Field("gemini-2.5-pro", description="Media Agent LLM 模型名称，如 gemini-2.5-pro")
+    MEDIA_ENGINE_CLI_COMMAND: Optional[str] = Field(None, description="Media Agent CLI 命令模板，若配置则通过本地命令行调用 Codex 等模型。可使用 {model} 占位符。")
     
     # Query Agent（推荐DeepSeek，申请地址：https://www.deepseek.com/）
     QUERY_ENGINE_API_KEY: Optional[str] = Field(None, description="Query Agent（推荐 DeepSeek，官方申请地址：https://platform.deepseek.com/）API 密钥")
     QUERY_ENGINE_BASE_URL: Optional[str] = Field("https://api.deepseek.com", description="Query Agent LLM BaseUrl")
     QUERY_ENGINE_MODEL_NAME: str = Field("deepseek-chat", description="Query Agent LLM 模型名称，如 deepseek-reasoner")
+    QUERY_ENGINE_CLI_COMMAND: Optional[str] = Field(None, description="Query Agent CLI 命令模板，例如 'codex chat --model {model}'。设置后无需 API Key。")
     
     # Report Agent（推荐Gemini，推荐中转厂商：https://aihubmix.com/?aff=8Ds9）
     REPORT_ENGINE_API_KEY: Optional[str] = Field(None, description="Report Agent（推荐 Gemini-2.5-pro，中转厂商申请地址：https://aihubmix.com/?aff=8Ds9）API 密钥")
     REPORT_ENGINE_BASE_URL: Optional[str] = Field("https://aihubmix.com/v1", description="Report Agent LLM BaseUrl，可根据中转服务调整")
     REPORT_ENGINE_MODEL_NAME: str = Field("gemini-2.5-pro", description="Report Agent LLM 模型名称，如 gemini-2.5-pro")
+    REPORT_ENGINE_CLI_COMMAND: Optional[str] = Field(None, description="Report Agent CLI 命令模板，用于通过本地命令行调用模型。可包含 {model} 占位符。")
 
     # MindSpider Agent（推荐Deepseek，官方申请地址：https://platform.deepseek.com/）
     MINDSPIDER_API_KEY: Optional[str] = Field(None, description="MindSpider Agent（推荐 DeepSeek，官方申请地址：https://platform.deepseek.com/）API 密钥")
     MINDSPIDER_BASE_URL: Optional[str] = Field(None, description="MindSpider Agent BaseUrl，可按所选服务配置")
     MINDSPIDER_MODEL_NAME: Optional[str] = Field(None, description="MindSpider Agent 模型名称，例如 deepseek-reasoner")
+    MINDSPIDER_CLI_COMMAND: Optional[str] = Field(None, description="MindSpider Agent CLI 命令模板，支持通过登陆态的 Codex 等命令行工具调用。")
     
     # Forum Host（Qwen3最新模型，这里我使用了硅基流动这个平台，申请地址：https://cloud.siliconflow.cn/）
     FORUM_HOST_API_KEY: Optional[str] = Field(None, description="Forum Host（推荐 qwen-plus，官方申请地址：https://www.aliyun.com/product/bailian）API 密钥")
     FORUM_HOST_BASE_URL: Optional[str] = Field(None, description="Forum Host LLM BaseUrl，可按所选服务配置")
     FORUM_HOST_MODEL_NAME: Optional[str] = Field(None, description="Forum Host LLM 模型名称，例如 qwen-plus")
+    FORUM_HOST_CLI_COMMAND: Optional[str] = Field(None, description="Forum Host CLI 命令模板，用于通过命令行方式运行主持人模型。")
     
     # SQL keyword Optimizer（小参数Qwen3模型，这里我使用了硅基流动这个平台，申请地址：https://cloud.siliconflow.cn/）
     KEYWORD_OPTIMIZER_API_KEY: Optional[str] = Field(None, description="SQL Keyword Optimizer（推荐 qwen-plus，官方申请地址：https://www.aliyun.com/product/bailian）API 密钥")
     KEYWORD_OPTIMIZER_BASE_URL: Optional[str] = Field(None, description="Keyword Optimizer BaseUrl，可按所选服务配置")
     KEYWORD_OPTIMIZER_MODEL_NAME: Optional[str] = Field(None, description="Keyword Optimizer LLM 模型名称，例如 qwen-plus")
+    KEYWORD_OPTIMIZER_CLI_COMMAND: Optional[str] = Field(None, description="Keyword Optimizer CLI 命令模板，可使用 {model} 占位符。")
     
     # ================== 网络工具配置 ====================
     # Tavily API（申请地址：https://www.tavily.com/）

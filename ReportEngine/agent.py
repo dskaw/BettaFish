@@ -167,6 +167,7 @@ class ReportAgent:
             api_key=self.config.REPORT_ENGINE_API_KEY,
             model_name=self.config.REPORT_ENGINE_MODEL_NAME,
             base_url=self.config.REPORT_ENGINE_BASE_URL,
+            cli_command=getattr(self.config, "REPORT_ENGINE_CLI_COMMAND", None),
         )
     
     def _initialize_nodes(self):
