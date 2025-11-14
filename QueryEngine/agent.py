@@ -62,6 +62,7 @@ class DeepSearchAgent:
             api_key=self.config.QUERY_ENGINE_API_KEY,
             model_name=self.config.QUERY_ENGINE_MODEL_NAME,
             base_url=self.config.QUERY_ENGINE_BASE_URL,
+            cli_command=getattr(self.config, "QUERY_ENGINE_CLI_COMMAND", None),
         )
     
     def _initialize_nodes(self):

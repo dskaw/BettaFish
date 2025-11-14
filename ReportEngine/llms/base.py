@@ -4,7 +4,7 @@ Unified OpenAI-compatible LLM client for the Report Engine, with retry support.
 
 import os
 import sys
-from typing import Any, Dict, Optional, Generator
+from typing import Any, Dict, List, Optional, Generator
 from loguru import logger
 
 from openai import OpenAI
@@ -17,6 +17,7 @@ if utils_dir not in sys.path:
 
 try:
     from retry_helper import with_retry, LLM_RETRY_CONFIG
+    from cli_llm import CodexCLIError, CodexCLIInvoker
 except ImportError:
     def with_retry(config=None):
         def decorator(func):
@@ -25,13 +26,23 @@ except ImportError:
 
     LLM_RETRY_CONFIG = None
 
+    CodexCLIError = RuntimeError  # type: ignore
+
+    class CodexCLIInvoker:  # type: ignore
+        def __init__(self, *args, **kwargs):
+            raise NotImplementedError("CodexCLIInvoker requires utils.cli_llm")
+
 
 class LLMClient:
-    """Minimal wrapper around the OpenAI-compatible chat completion API."""
+    """Wrapper around either an OpenAI-compatible API or the Codex CLI."""
 
-    def __init__(self, api_key: str, model_name: str, base_url: Optional[str] = None):
-        if not api_key:
-            raise ValueError("Report Engine LLM API key is required.")
+    def __init__(
+        self,
+        api_key: Optional[str],
+        model_name: str,
+        base_url: Optional[str] = None,
+        cli_command: Optional[str] = None,
+    ):
         if not model_name:
             raise ValueError("Report Engine model name is required.")
 
@@ -39,33 +50,50 @@ class LLMClient:
         self.base_url = base_url
         self.model_name = model_name
         self.provider = model_name
+        self.cli_command = cli_command
+        self._cli_invoker: Optional[CodexCLIInvoker] = None
+
         timeout_fallback = os.getenv("LLM_REQUEST_TIMEOUT") or os.getenv("REPORT_ENGINE_REQUEST_TIMEOUT") or "3000"
         try:
             self.timeout = float(timeout_fallback)
         except ValueError:
             self.timeout = 3000.0
 
-        client_kwargs: Dict[str, Any] = {
-            "api_key": api_key,
-            "max_retries": 0,
-        }
-        if base_url:
-            client_kwargs["base_url"] = base_url
-        self.client = OpenAI(**client_kwargs)
+        if cli_command:
+            self.provider = "codex-cli"
+            self._cli_invoker = CodexCLIInvoker(cli_command, self.timeout)
+            self.client = None  # type: ignore[assignment]
+        else:
+            if not api_key:
+                raise ValueError("Report Engine LLM API key is required when Codex CLI command is not set.")
+
+            client_kwargs: Dict[str, Any] = {
+                "api_key": api_key,
+                "max_retries": 0,
+            }
+            if base_url:
+                client_kwargs["base_url"] = base_url
+            self.client = OpenAI(**client_kwargs)
 
     @with_retry(LLM_RETRY_CONFIG)
     def invoke(self, system_prompt: str, user_prompt: str, **kwargs) -> str:
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ]
+        messages = self._prepare_messages(system_prompt, user_prompt)
 
         allowed_keys = {"temperature", "top_p", "presence_penalty", "frequency_penalty", "stream"}
         extra_params = {key: value for key, value in kwargs.items() if key in allowed_keys and value is not None}
 
         timeout = kwargs.pop("timeout", self.timeout)
 
-        response = self.client.chat.completions.create(
+        if self._cli_invoker:
+            prompt = self._render_messages(messages)
+            try:
+                response_text = self._cli_invoker.run(prompt, model_name=self.model_name, timeout=timeout)
+            except CodexCLIError as exc:
+                logger.error(f"Codex CLI 调用失败: {exc}")
+                raise
+            return self.validate_response(response_text)
+
+        response = self.client.chat.completions.create(  # type: ignore[union-attr]
             model=self.model_name,
             messages=messages,
             timeout=timeout,
@@ -77,37 +105,35 @@ class LLMClient:
         return ""
 
     def stream_invoke(self, system_prompt: str, user_prompt: str, **kwargs) -> Generator[str, None, None]:
-        """
-        流式调用LLM，逐步返回响应内容
-        
-        Args:
-            system_prompt: 系统提示词
-            user_prompt: 用户提示词
-            **kwargs: 额外参数（temperature, top_p等）
-            
-        Yields:
-            响应文本块（str）
-        """
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ]
+        """流式调用LLM，逐步返回响应内容"""
+
+        messages = self._prepare_messages(system_prompt, user_prompt)
 
         allowed_keys = {"temperature", "top_p", "presence_penalty", "frequency_penalty"}
         extra_params = {key: value for key, value in kwargs.items() if key in allowed_keys and value is not None}
-        # 强制使用流式
         extra_params["stream"] = True
 
         timeout = kwargs.pop("timeout", self.timeout)
 
+        if self._cli_invoker:
+            prompt = self._render_messages(messages)
+            try:
+                for chunk in self._cli_invoker.stream(prompt, model_name=self.model_name, timeout=timeout):
+                    if chunk:
+                        yield chunk
+            except CodexCLIError as exc:
+                logger.error(f"Codex CLI 流式请求失败: {exc}")
+                raise
+            return
+
         try:
-            stream = self.client.chat.completions.create(
+            stream = self.client.chat.completions.create(  # type: ignore[union-attr]
                 model=self.model_name,
                 messages=messages,
                 timeout=timeout,
                 **extra_params,
             )
-            
+
             for chunk in stream:
                 if chunk.choices and len(chunk.choices) > 0:
                     delta = chunk.choices[0].delta
@@ -146,9 +172,31 @@ class LLMClient:
             return ""
         return response.strip()
 
+    @staticmethod
+    def _prepare_messages(system_prompt: str, user_prompt: str) -> List[Dict[str, str]]:
+        return [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+
+    @staticmethod
+    def _render_messages(messages: List[Dict[str, str]]) -> str:
+        parts = []
+        for message in messages:
+            role = message.get("role", "user")
+            content = message.get("content", "")
+            if not content:
+                continue
+            parts.append(f"[{role}]\n{content}")
+        return "\n\n".join(parts).strip()
+
     def get_model_info(self) -> Dict[str, Any]:
-        return {
+        info: Dict[str, Any] = {
             "provider": self.provider,
             "model": self.model_name,
-            "api_base": self.base_url or "default",
         }
+        if self._cli_invoker:
+            info["cli_command"] = self.cli_command
+        else:
+            info["api_base"] = self.base_url or "default"
+        return info
